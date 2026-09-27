@@ -1,5 +1,5 @@
 // Keeps the app shell available offline. Songs live in IndexedDB, and lyrics come from lrclib.net.
-const CACHE = 'nightjar-v1';
+const CACHE = 'nightjar-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

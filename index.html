@@ -150,6 +150,23 @@ body.playing .phones{animation:bob .7s steps(2,end) infinite}
 .sheet input{font:500 15px "Spline Sans Mono",monospace;padding:10px;border:2px solid var(--disc);border-radius:4px;background:#fffaf0;color:var(--ink);width:100%}
 .sheet-actions{display:flex;justify-content:flex-end;gap:10px}
 .ghost{font:600 12px "Spline Sans Mono",monospace;letter-spacing:.14em;padding:9px 11px;text-transform:uppercase}
+.head-btns{display:flex;gap:8px}
+.sp-btn{--disc:#3f8f5a}
+.crate{position:fixed;inset:0;z-index:6;background:var(--paper);color:var(--ink);display:grid;grid-template-rows:auto auto auto auto 1fr;
+  padding:calc(12px + env(safe-area-inset-top,0px)) 16px 0;max-width:560px;margin-inline:auto;-webkit-user-select:text;user-select:text}
+.crate-top{display:flex;align-items:center;gap:8px;min-height:44px}
+.crate-top h2{flex:1;margin:0;font:400 24px/1.1 "Young Serif",Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crate-tabs{display:flex;gap:6px;margin-block:8px;overflow-x:auto}
+.crate-tabs button{font:600 11px "Spline Sans Mono",monospace;letter-spacing:.14em;text-transform:uppercase;padding:8px 10px;border-radius:4px;color:var(--ink-soft)}
+.crate-tabs button[aria-selected=true]{background:#3f8f5a;color:var(--cream);box-shadow:-3px 3px 0 var(--label)}
+.crate-search input{width:100%;font:500 16px "Spline Sans Mono",monospace;padding:11px 12px;border:2px solid #3f8f5a;border-radius:4px;background:#fffaf0;color:var(--ink);margin-bottom:8px}
+.crate-note{font-size:13px;line-height:1.5;padding:10px 2px;display:grid;gap:10px;justify-items:start}
+.crate-list{list-style:none;margin:0;padding:0 0 calc(24px + env(safe-area-inset-bottom,0px));overflow-y:auto;-webkit-overflow-scrolling:touch}
+.crate-list button{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;padding:8px 2px;border-bottom:1px solid rgba(44,42,51,.1)}
+.crate-list img,.crate-list .noart{width:48px;height:48px;border-radius:3px;object-fit:cover;background:#3f8f5a;box-shadow:-3px 3px 0 var(--label)}
+.crate-list b{display:block;font:400 16px/1.25 "Young Serif",Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crate-list small{display:block;font-size:11px;letter-spacing:.06em;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.crate-list .dur{font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .drop{position:fixed;inset:12px;border:3px dashed var(--label);border-radius:14px;display:grid;place-items:center;background:rgba(236,229,214,.85);font:400 22px "Young Serif",serif;z-index:5;pointer-events:none}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--cream);padding:8px 14px;border-radius:4px;font-size:13px;z-index:6;max-width:calc(100% - 32px)}
 
@@ -174,7 +191,7 @@ body.playing .phones{animation:bob .7s steps(2,end) infinite}
         <div><b>NIGHTJAR</b><small>RECORDS</small></div>
       </div>
       <span class="side" id="sideLabel">Side A · 1 of 3</span>
-      <button class="add-btn" id="addBtn" aria-label="Add songs">+ ADD</button>
+      <span class="head-btns"><button class="add-btn sp-btn" id="spBtn" hidden>SPOTIFY</button><button class="add-btn" id="addBtn" aria-label="Add songs">+ ADD</button></span>
     </div>
 
     <div class="table">
@@ -292,6 +309,22 @@ body.playing .phones{animation:bob .7s steps(2,end) infinite}
     </div>
   </form>
 </div>
+<section class="crate" id="crate" hidden aria-label="Spotify">
+  <div class="crate-top">
+    <button class="ghost" id="crateBack" hidden>‹ Back</button>
+    <h2 id="crateTitle">Spotify</h2>
+    <button class="ghost" id="crateClose">Done</button>
+  </div>
+  <div class="crate-tabs" role="tablist">
+    <button role="tab" data-tab="search" aria-selected="true">Search</button>
+    <button role="tab" data-tab="playlists">Playlists</button>
+    <button role="tab" data-tab="liked">Liked</button>
+    <button role="tab" data-tab="recent">Recent</button>
+  </div>
+  <form id="crateSearch" class="crate-search"><input id="crateQ" type="search" placeholder="Songs, artists, albums" autocomplete="off" enterkeyhint="search"></form>
+  <div class="crate-note" id="crateNote" hidden></div>
+  <ul class="crate-list" id="crateList"></ul>
+</section>
 <div class="sheet-wrap" id="spHandoff" hidden>
   <div class="sheet">
     <h2>Almost there</h2>
@@ -632,6 +665,12 @@ function showMenu() {
   const sp = document.createElement('button');
   sp.innerHTML = SP.tok ? '<span class="n">♫</span><span>disconnect spotify</span>' : '<span class="n">♫</span><span>connect spotify…</span>';
   sp.addEventListener('click', () => SP.tok ? spDisconnect() : openSpSheet());
+  if (SP.tok) {
+    const br = document.createElement('button');
+    br.innerHTML = '<span class="n">▶</span><span>browse spotify…</span>';
+    br.addEventListener('click', () => openCrate());
+    const l = document.createElement('li'); l.appendChild(br); ul.appendChild(l);
+  }
   { const l = document.createElement('li'); l.appendChild(sp); ul.appendChild(l); }
   const t = tracks[idx];
   if (t && (t.kind === 'file' || t.kind === 'spotify') && t.lyricState !== 'spotify-idle') {
@@ -861,7 +900,7 @@ async function fetchLyrics(t, force) {
 const SP = {
   tok: store.get('nj.spTok', null),
   redirect: location.origin + location.pathname,
-  scopes: 'user-read-playback-state user-modify-playback-state user-read-currently-playing'
+  scopes: 'user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read user-read-recently-played'
 };
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -873,7 +912,7 @@ const spotify = {
   playing: false, progress: 0, at: 0, duration: 0,
   isPlaying() { return this.playing; },
   time() { return this.playing ? Math.min(this.duration, this.progress + (performance.now() - this.at) / 1000) : this.progress; },
-  play() { this.progress = this.time(); this.at = performance.now(); this.playing = true; spCmd('PUT', '/me/player/play'); },
+  play() { if (!spTrack.itemId) { openCrate(); return; } this.progress = this.time(); this.at = performance.now(); this.playing = true; spCmd('PUT', '/me/player/play'); },
   pause() { this.progress = this.time(); this.playing = false; spCmd('PUT', '/me/player/pause'); },
   seek(s) { this.progress = clamp(s, 0, this.duration); this.at = performance.now(); spCmd('PUT', '/me/player/seek?position_ms=' + Math.round(this.progress * 1000)); },
   next() { spCmd('POST', '/me/player/next'); },
@@ -898,6 +937,9 @@ $('#spForm').addEventListener('submit', async e => {
     return;
   }
   if (!/^[0-9a-f]{32}$/i.test(v)) { toast('A Spotify Client ID is 32 letters and numbers.'); return; }
+  spAuthorize(v);
+});
+async function spAuthorize(v) {
   store.set('nj.spClient', v);
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
@@ -905,7 +947,7 @@ $('#spForm').addEventListener('submit', async e => {
   const state = b64url(new TextEncoder().encode(JSON.stringify({ v: verifier, c: v })));
   location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({ response_type: 'code', client_id: v, scope: SP.scopes,
     redirect_uri: SP.redirect, code_challenge_method: 'S256', code_challenge: challenge, state });
-});
+}
 $('#spHandoffClose').addEventListener('click', () => $('#spHandoff').hidden = true);
 $('#spCopy').addEventListener('click', () => {
   const inp = $('#spCode');
@@ -916,14 +958,14 @@ async function spToken(params) {
   const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
   if (!r.ok) throw new Error('token ' + r.status);
   const j = await r.json();
-  SP.tok = { access: j.access_token, refresh: j.refresh_token || (SP.tok && SP.tok.refresh), exp: Date.now() + (j.expires_in - 60) * 1000 };
+  SP.tok = { access: j.access_token, refresh: j.refresh_token || (SP.tok && SP.tok.refresh), exp: Date.now() + (j.expires_in - 60) * 1000, scope: j.scope || (SP.tok && SP.tok.scope) || '' };
   store.set('nj.spTok', SP.tok);
 }
 const spRefresh = () => spToken({ grant_type: 'refresh_token', refresh_token: SP.tok.refresh, client_id: store.get('nj.spClient', '') });
 async function spFetch(path, opts = {}) {
   if (!SP.tok) throw new Error('not connected');
   if (!SP.tok.access || Date.now() > SP.tok.exp) await spRefresh();
-  const go = () => fetch('https://api.spotify.com/v1' + path, { ...opts, headers: { Authorization: 'Bearer ' + SP.tok.access } });
+  const go = () => fetch('https://api.spotify.com/v1' + path, { ...opts, headers: { Authorization: 'Bearer ' + SP.tok.access, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
   let r = await go();
   if (r.status === 401) { await spRefresh(); r = await go(); }
   return r;
@@ -963,6 +1005,7 @@ async function spPoll() {
   }
 }
 function spStart() {
+  $('#spBtn').hidden = false;
   if (!tracks.includes(spTrack)) { tracks.unshift(spTrack); idx++; }
   load(0, false);
   spPoll();
@@ -970,7 +1013,7 @@ function spStart() {
   spTimer = setInterval(() => { if (!document.hidden) spPoll(); }, 3000);
 }
 function spDisconnect(expired) {
-  SP.tok = null; store.set('nj.spTok', null); clearInterval(spTimer);
+  SP.tok = null; store.set('nj.spTok', null); clearInterval(spTimer); $('#spBtn').hidden = true; $('#crate').hidden = true;
   const i = tracks.indexOf(spTrack);
   if (i >= 0) { tracks.splice(i, 1); if (cur === spotify) { cur = null; load(0, false); } else if (idx > i) idx--; }
   toast(expired ? 'Spotify disconnected. Connect again from the menu.' : 'Spotify disconnected');
@@ -992,6 +1035,119 @@ async function spHandleRedirect() {
   } else toast('Spotify connected');
   return true;
 }
+
+/* ---------- Spotify browser ("the crate") ---------- */
+const NEEDED = ['playlist-read-private', 'user-library-read', 'user-read-recently-played'];
+const crate = { tab: 'search', stack: [], lastQ: '' };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function openCrate(tab) {
+  $('#crate').hidden = false;
+  if (tab) crate.tab = tab;
+  crate.stack = [];
+  showTab(crate.tab);
+}
+$('#crateClose').addEventListener('click', () => $('#crate').hidden = true);
+$('#crateBack').addEventListener('click', () => { crate.stack.pop(); showTab(crate.tab); });
+document.querySelectorAll('.crate-tabs button').forEach(b => b.addEventListener('click', () => { crate.stack = []; showTab(b.dataset.tab); }));
+$('#crateSearch').addEventListener('submit', e => { e.preventDefault(); $('#crateQ').blur(); runSearch(); });
+let searchTimer;
+$('#crateQ').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 450); });
+
+function crateNote(html) { const n = $('#crateNote'); n.hidden = !html; n.innerHTML = html || ''; }
+function needsReconnect() {
+  const granted = (SP.tok && SP.tok.scope) || '';
+  return NEEDED.some(s => !granted.includes(s));
+}
+function reconnectNote() {
+  crateNote('<span>Nightjar needs a little more permission to show your playlists, liked songs and history. Reconnect once to allow it.</span><button class="add-btn" id="crateReconnect">Reconnect Spotify</button>');
+  $('#crateReconnect').addEventListener('click', () => spAuthorize(store.get('nj.spClient', '')));
+}
+function showTab(tab) {
+  crate.tab = tab;
+  document.querySelectorAll('.crate-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  const inner = crate.stack[crate.stack.length - 1];
+  $('#crateBack').hidden = !inner;
+  $('#crateTitle').textContent = inner ? inner.name : 'Spotify';
+  $('#crateSearch').hidden = tab !== 'search' || !!inner;
+  crateNote('');
+  $('#crateList').innerHTML = '';
+  if (inner) return loadPlaylist(inner);
+  if (tab === 'search') { if (crate.lastQ) runSearch(); else crateNote('Search Spotify, then tap a song to play it.'); return; }
+  if (needsReconnect()) return reconnectNote();
+  if (tab === 'playlists') return loadList('/me/playlists?limit=50', j => j.items.filter(Boolean).map(p => ({ kind: 'playlist', p })));
+  if (tab === 'liked') return loadList('/me/tracks?limit=50', j => trackRows(j.items.map(i => i.track), 'uris'));
+  if (tab === 'recent') return loadList('/me/player/recently-played?limit=50', j => {
+    const seen = new Set();
+    return trackRows(j.items.map(i => i.track).filter(t => t && !seen.has(t.uri) && seen.add(t.uri)), 'uris');
+  });
+}
+async function runSearch() {
+  const q = $('#crateQ').value.trim(); crate.lastQ = q;
+  if (!q) { $('#crateList').innerHTML = ''; crateNote('Search Spotify, then tap a song to play it.'); return; }
+  await loadList('/search?' + new URLSearchParams({ q, type: 'track', limit: 30 }), j => trackRows(j.tracks.items, 'single'), () => $('#crateQ').value.trim() === q);
+}
+function loadPlaylist(p) {
+  return loadList('/playlists/' + p.id + '/tracks?limit=100', j => trackRows(j.items.map(i => i.track || i.item), 'context', p.uri));
+}
+function trackRows(list, how, context) {
+  const tracks = list.filter(t => t && t.uri && t.type !== 'episode');
+  const uris = tracks.map(t => t.uri);
+  return tracks.map(t => ({ kind: 'track', t, how, context, uris }));
+}
+async function loadList(path, toRows, stillWanted) {
+  crateNote('Loading…');
+  let r;
+  try { r = await spFetch(path); } catch (e) { crateNote("Couldn't reach Spotify. Check your connection."); return; }
+  if (stillWanted && !stillWanted()) return;
+  if (r.status === 403 || r.status === 401) return reconnectNote();
+  if (!r.ok) { crateNote(r.status === 404 ? "Spotify doesn't let apps like Nightjar open this playlist. Playlists you made or saved yourself work." : 'Spotify returned an error (' + r.status + '). Try again.'); return; }
+  const rows = toRows(await r.json());
+  crateNote(rows.length ? '' : 'Nothing here yet.');
+  const ul = $('#crateList'); ul.innerHTML = '';
+  for (const row of rows) {
+    const li = document.createElement('li'), b = document.createElement('button');
+    if (row.kind === 'playlist') {
+      const img = row.p.images && row.p.images[0] ? row.p.images[0].url : null;
+      b.innerHTML = (img ? `<img src="${esc(img)}" alt="" loading="lazy">` : '<span class="noart"></span>') +
+        `<span><b>${esc(row.p.name)}</b><small>${esc((row.p.owner && row.p.owner.display_name) || '')} · ${row.p.tracks ? row.p.tracks.total : ''} songs</small></span><span class="dur">›</span>`;
+      b.addEventListener('click', () => { crate.stack.push(row.p); showTab(crate.tab); });
+    } else {
+      const t = row.t, imgs = t.album && t.album.images, img = imgs && imgs.length ? imgs[imgs.length > 2 ? 2 : imgs.length - 1].url : null;
+      b.innerHTML = (img ? `<img src="${esc(img)}" alt="" loading="lazy">` : '<span class="noart"></span>') +
+        `<span><b>${esc(t.name)}</b><small>${esc((t.artists || []).map(a => a.name).join(', '))}</small></span><span class="dur">${fmt(t.duration_ms / 1000)}</span>`;
+      b.addEventListener('click', () => spPlayFrom(row));
+    }
+    li.appendChild(b); ul.appendChild(li);
+  }
+}
+async function spDevice() {
+  const r = await spFetch('/me/player/devices');
+  if (!r.ok) return null;
+  const list = (await r.json()).devices || [];
+  return list.find(d => d.is_active) || list.find(d => d.type === 'Smartphone') || list[0] || null;
+}
+async function spPlayFrom(row) {
+  let body;
+  if (row.how === 'context') body = { context_uri: row.context, offset: { uri: row.t.uri } };
+  else if (row.how === 'uris') { const i = row.uris.indexOf(row.t.uri); body = { uris: row.uris.slice(i, i + 100) }; }
+  else body = { uris: [row.t.uri] };
+  try {
+    const dev = await spDevice();
+    if (!dev) {
+      crateNote('<span>Spotify needs to be open on this phone first. Open the Spotify app for a moment, come back, and tap the song again.</span><a class="add-btn" href="spotify://">Open Spotify</a>');
+      return;
+    }
+    const r = await spFetch('/me/player/play?device_id=' + encodeURIComponent(dev.id), { method: 'PUT', body: JSON.stringify(body) });
+    if (r.status === 403) { toast('Playing songs from Nightjar needs Spotify Premium.'); return; }
+    if (!r.ok && r.status !== 204) { toast('Spotify could not start that song (' + r.status + ').'); return; }
+  } catch (e) { toast("Couldn't reach Spotify."); return; }
+  $('#crate').hidden = true;
+  const i = tracks.indexOf(spTrack);
+  if (i >= 0 && idx !== i) load(i, false);
+  spotify.playing = true;
+  setTimeout(spPoll, 500); setTimeout(spPoll, 1500);
+}
+$('#spBtn').addEventListener('click', () => openCrate());
 
 /* ---------- Adding songs ---------- */
 async function addFiles(list) {

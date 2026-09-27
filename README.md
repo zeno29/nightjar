@@ -11,7 +11,7 @@ A music player with two screens:
 2. Tap **Share → Add to Home Screen**.
 3. Open Nightjar from your Home Screen. It runs full-screen like an app.
 
-To connect Spotify, open the menu on the Lyrics screen and choose **connect spotify**. Nightjar then follows whatever the Spotify app is playing. Playback controls need Spotify Premium.
+To connect Spotify, open the menu on the Lyrics screen and choose **connect spotify**. Tap **SPOTIFY** on the turntable screen to search Spotify or open your playlists, liked songs and recent plays, then tap a song to play it. The sound comes from the Spotify app, which needs to be open in the background, and the turntable and lyrics follow along. Playing and controlling songs needs Spotify Premium.
 
 Tap **+ ADD** to pick songs from the Files app. The songs are saved on your phone, so they're still there next time. Nightjar reads each song's title, artist, album and cover from its tags, or from a file name like `Artist - Title.mp3`. It then fetches lyrics automatically from [LRCLIB](https://lrclib.net), a free, open lyrics database. You can also import a `.lrc` file with the same name as the song.
 
