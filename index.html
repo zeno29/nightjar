@@ -1074,7 +1074,7 @@ function showTab(tab) {
   if (inner) return loadPlaylist(inner);
   if (tab === 'search') { if (crate.lastQ) runSearch(); else crateNote('Search Spotify, then tap a song to play it.'); return; }
   if (needsReconnect()) return reconnectNote();
-  if (tab === 'playlists') return loadList('/me/playlists?limit=50', j => j.items.filter(Boolean).map(p => ({ kind: 'playlist', p })));
+  if (tab === 'playlists') return loadList('/me/playlists?limit=50', j => (j.items || []).filter(Boolean).map(p => ({ kind: 'playlist', p })));
   if (tab === 'liked') return loadList('/me/tracks?limit=50', j => trackRows(j.items.map(i => i.track), 'uris'));
   if (tab === 'recent') return loadList('/me/player/recently-played?limit=50', j => {
     const seen = new Set();
@@ -1084,24 +1084,50 @@ function showTab(tab) {
 async function runSearch() {
   const q = $('#crateQ').value.trim(); crate.lastQ = q;
   if (!q) { $('#crateList').innerHTML = ''; crateNote('Search Spotify, then tap a song to play it.'); return; }
-  await loadList('/search?' + new URLSearchParams({ q, type: 'track', limit: 30 }), j => trackRows(j.tracks.items, 'single'), () => $('#crateQ').value.trim() === q);
+  // Apps in Spotify's development mode get at most 10 search results per request, so fetch a few pages.
+  const pages = [0, 10, 20].map(offset => '/search?' + new URLSearchParams({ q, type: 'track', limit: 10, offset }));
+  await loadList(pages, j => trackRows(j.tracks ? j.tracks.items : [], 'single'), () => $('#crateQ').value.trim() === q);
 }
 function loadPlaylist(p) {
-  return loadList('/playlists/' + p.id + '/tracks?limit=100', j => trackRows(j.items.map(i => i.track || i.item), 'context', p.uri));
+  return loadList(['/playlists/' + p.id + '/items?limit=50', '/playlists/' + p.id + '/tracks?limit=50'], j => trackRows((j.items || []).map(i => i.item || i.track), 'context', p.uri), null, true);
 }
 function trackRows(list, how, context) {
   const tracks = list.filter(t => t && t.uri && t.type !== 'episode');
   const uris = tracks.map(t => t.uri);
   return tracks.map(t => ({ kind: 'track', t, how, context, uris }));
 }
-async function loadList(path, toRows, stillWanted) {
+async function spError(r) {
+  try { const j = await r.json(); return (j.error && (j.error.message || j.error)) || ''; } catch (e) { return ''; }
+}
+async function loadList(paths, toRows, stillWanted, alternatives) {
   crateNote('Loading…');
-  let r;
-  try { r = await spFetch(path); } catch (e) { crateNote("Couldn't reach Spotify. Check your connection."); return; }
-  if (stillWanted && !stillWanted()) return;
-  if (r.status === 403 || r.status === 401) return reconnectNote();
-  if (!r.ok) { crateNote(r.status === 404 ? "Spotify doesn't let apps like Nightjar open this playlist. Playlists you made or saved yourself work." : 'Spotify returned an error (' + r.status + '). Try again.'); return; }
-  const rows = toRows(await r.json());
+  paths = [].concat(paths);
+  let rows = [], firstBad = null;
+  for (const path of paths) {
+    let r;
+    try { r = await spFetch(path); } catch (e) { crateNote("Couldn't reach Spotify. Check your connection."); return; }
+    if (stillWanted && !stillWanted()) return;
+    if (r.ok) {
+      const got = toRows(await r.json());
+      rows = rows.concat(got);
+      if (alternatives) { firstBad = null; break; }
+      if (got.length < 10) break;
+      continue;
+    }
+    if (!firstBad) firstBad = { status: r.status, msg: await spError(r) };
+    if (!alternatives) break;
+  }
+  if (!rows.length && firstBad) {
+    const { status, msg } = firstBad;
+    if (status === 401 || (status === 403 && /scope/i.test(msg))) return reconnectNote();
+    crateNote(status === 404 ? "Spotify doesn't let apps like Nightjar open this playlist. Playlists you made or saved yourself work."
+      : status === 403 ? "Spotify didn't allow that" + (msg ? ': ' + esc(msg) : '.') + ' Apps in development mode only work for accounts added under User Management in your Spotify app settings.'
+      : 'Spotify returned an error (' + status + (msg ? ': ' + esc(msg) : '') + '). Try again.');
+    return;
+  }
+  const seen = new Set();
+  rows = rows.filter(row => { const k = row.kind === 'track' ? row.t.uri : row.p.id; return !seen.has(k) && seen.add(k); });
+  if (rows.length && rows[0].kind === 'track') { const uris = rows.map(x => x.t.uri); rows.forEach(x => { if (x.how !== 'context') x.uris = uris; }); }
   crateNote(rows.length ? '' : 'Nothing here yet.');
   const ul = $('#crateList'); ul.innerHTML = '';
   for (const row of rows) {
